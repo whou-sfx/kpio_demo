@@ -1,0 +1,557 @@
+diff --git a/kmip/core/attributes.py b/kmip/core/attributes.py
+index d278868..6c21fe0 100644
+--- a/kmip/core/attributes.py
++++ b/kmip/core/attributes.py
+@@ -211,6 +211,30 @@ class Name(Struct):
+         return not self.__eq__(other)
+ 
+ 
++# 3.3
++class Link(Struct):
++
++    def __init__(self, link_type=None, link_object_identifier=None):
++        super(Link, self).__init__(tag=Tags.LINK)
++        self.link_type = primitives.Enumeration(
++            enums.ObjectType,
++            value=link_type,
++            tag=enums.Tags.LINK_TYPE
++        )
++        self.link_object_identifier = link_object_identifier
++
++    def write(self, ostream, kmip_version=enums.KMIPVersion.KMIP_2_0):
++        tstream = BytearrayStream()
++
++        # Write the value and type of the name
++        self.link_type.write(tstream, kmip_version=kmip_version)
++        self.link_object_identifier.write(tstream, kmip_version=kmip_version)
++
++        # Write the length and value of the template attribute
++        self.length = tstream.length()
++        super(Link, self).write(ostream, kmip_version=kmip_version)
++        ostream.write(tstream.buffer)
++
+ # 3.3
+ class ObjectType(Enumeration):
+ 
+@@ -274,6 +298,7 @@ class CryptographicParameters(Struct):
+                  key_role_type=None,
+                  digital_signature_algorithm=None,
+                  cryptographic_algorithm=None,
++                 cryptographic_length=None,
+                  random_iv=None,
+                  iv_length=None,
+                  tag_length=None,
+@@ -290,6 +315,7 @@ class CryptographicParameters(Struct):
+         self._key_role_type = None
+         self._digital_signature_algorithm = None
+         self._cryptographic_algorithm = None
++        self._cryptographic_length = None
+         self._random_iv = None
+         self._iv_length = None
+         self._tag_length = None
+@@ -304,6 +330,7 @@ class CryptographicParameters(Struct):
+         self.key_role_type = key_role_type
+         self.digital_signature_algorithm = digital_signature_algorithm
+         self.cryptographic_algorithm = cryptographic_algorithm
++        self.cryptographic_length = cryptographic_length
+         self.random_iv = random_iv
+         self.iv_length = iv_length
+         self.tag_length = tag_length
+@@ -446,6 +473,25 @@ class CryptographicParameters(Struct):
+                 "enumeration"
+             )
+ 
++    @property
++    def cryptographic_length(self):
++        if self._cryptographic_length:
++            return self._cryptographic_length.value
++        else:
++            return None
++
++    @cryptographic_length.setter
++    def cryptographic_length(self, value):
++        if value is None:
++            self._cryptographic_length = None
++        elif isinstance(value, six.integer_types):
++            self._cryptographic_length = Integer(
++                value=value,
++                tag=Tags.CRYPTOGRAPHIC_LENGTH
++            )
++        else:
++            raise TypeError("cryptographic length must be a integer")
++
+     @property
+     def random_iv(self):
+         if self._random_iv:
+diff --git a/kmip/core/messages/payloads/__init__.py b/kmip/core/messages/payloads/__init__.py
+index cea8b42..09e2d38 100644
+--- a/kmip/core/messages/payloads/__init__.py
++++ b/kmip/core/messages/payloads/__init__.py
+@@ -140,6 +140,11 @@ from kmip.core.messages.payloads.signature_verify import (
+     SignatureVerifyResponsePayload
+ )
+ 
++from kmip.core.messages.payloads.imports import (
++    ImportRequestPayload,
++    ImportResponsePayload
++)
++
+ 
+ __all__ = [
+     "ActivateRequestPayload",
+@@ -202,5 +207,7 @@ __all__ = [
+     "SignRequestPayload",
+     "SignResponsePayload",
+     "SignatureVerifyRequestPayload",
+-    "SignatureVerifyResponsePayload"
++    "SignatureVerifyResponsePayload",
++    "ImportRequestPayload",
++    "ImportResponsePayload"
+ ]
+diff --git a/kmip/core/messages/payloads/imports.py b/kmip/core/messages/payloads/imports.py
+index 62715f6..8fe5135 100644
+--- a/kmip/core/messages/payloads/imports.py
++++ b/kmip/core/messages/payloads/imports.py
+@@ -1,65 +1,78 @@
+-#
+-#    http://www.apache.org/licenses/LICENSE-2.0
+-#
+-# Unless required by applicable law or agreed to in writing, software
+-# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+-# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+-# License for the specific language governing permissions and limitations
+-# under the License.
+-
+-import six
+-
+-from kmip.core import attributes
+-from kmip.core import enums
+-from kmip.core import primitives
+-from kmip.core import utils
+-from kmip.core.messages.payloads import base
+-
+-
+-class ImportRequestPayload(base.RequestPayload):
+-    """
+-       A request payload for the Import operation.
+-
+-       Args:
+-           unique_identifier: The unique ID of the managed object to be used for
+-               import.
+-           object_type: The type of the object to import.
+-           attributes:
+-           symmetric_key:
+-       """
+-
+-    def __init__(self,
+-                 unique_identifier=None,
+-                 object_type=None,
+-                 attributes=None,
+-                 symmetric_key=None):
+-        super(ImportRequestPayload, self).__init__()
+-
+-        self._unique_identifier = None
+-        self._object_type = None
+-
+-        self.unique_identifier = unique_identifier
+-        self.object_type = object_type
+-        self.attributes = attributes
+-        self.symmetric_key = symmetric_key
+-
+-
+-class ImportResponsePayload(base.ResponsePayload):
+-    """
+-           A request payload for the Import operation.
+-
+-           Args:
+-               unique_identifier: The unique ID of the managed object to be used for
+-                   import.
+-               object_type: The type of the object to import.
+-               attributes:
+-               symmetric_key:
+-           """
+-
+-    def __init__(self,
+-                 unique_identifier=None):
+-        super(ImportResponsePayload, self).__init__()
+-
+-        self._unique_identifier = None
+-
+-        self.unique_identifier = unique_identifier
++#
++#    http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++# License for the specific language governing permissions and limitations
++# under the License.
++
++import six
++
++from kmip.core import attributes
++from kmip.core import enums
++from kmip.core import primitives
++from kmip.core import utils
++from kmip.core.messages.payloads import base
++
++
++class ImportRequestPayload(base.RequestPayload):
++    """
++       A request payload for the Import operation.
++
++       Args:
++           unique_identifier: The unique ID of the managed object to be used for
++               import.
++           object_type: The type of the object to import.
++           attributes:
++           symmetric_key:
++       """
++
++    def __init__(self,
++                 unique_identifier=None,
++                 object_type=None,
++                 attributes=None,
++                 symmetric_key=None):
++        super(ImportRequestPayload, self).__init__()
++
++        self.unique_identifier = primitives.TextString(
++            value=unique_identifier,
++            tag=enums.Tags.UNIQUE_IDENTIFIER
++        )
++        self.object_type  = attributes.ObjectType(object_type)
++        self.attributes = attributes
++        self.symmetric_key = symmetric_key
++
++    def write(self, output_stream, kmip_version=enums.KMIPVersion.KMIP_2_0):
++        local_stream = utils.BytearrayStream()
++        self.unique_identifier.write(local_stream, kmip_version=kmip_version)
++        self.object_type.write(local_stream, kmip_version=kmip_version)
++        self.attributes.write(local_stream, kmip_version=kmip_version)
++        self.symmetric_key.write(local_stream, kmip_version=kmip_version)
++
++        self.length = local_stream.length()
++        super(ImportRequestPayload, self).write(
++            output_stream,
++            kmip_version=kmip_version
++        )
++        output_stream.write(local_stream.buffer)
++
++class ImportResponsePayload(base.ResponsePayload):
++    """
++           A request payload for the Import operation.
++
++           Args:
++               unique_identifier: The unique ID of the managed object to be used for
++                   import.
++               object_type: The type of the object to import.
++               attributes:
++               symmetric_key:
++           """
++
++    def __init__(self,
++                 unique_identifier=None):
++        super(ImportResponsePayload, self).__init__()
++
++        self._unique_identifier = None
++
++        self.unique_identifier = unique_identifier
+diff --git a/kmip/core/objects.py b/kmip/core/objects.py
+index fb49555..1ec34f4 100644
+--- a/kmip/core/objects.py
++++ b/kmip/core/objects.py
+@@ -45,7 +45,6 @@ from kmip.core.utils import BytearrayStream
+ # 2.1
+ # 2.1.1
+ class Attribute(Struct):
+-
+     class AttributeName(TextString):
+ 
+         def __init__(self, value=None):
+@@ -175,6 +174,45 @@ class Attribute(Struct):
+             return NotImplemented
+ 
+ 
++class VendorAttribute(Struct):
++    class VendorIdentification(TextString):
++
++        def __init__(self, value=None):
++            super(VendorAttribute.VendorIdentification, self).__init__(
++                value, Tags.VENDOR_IDENTIFICATION)
++
++    class AttributeName(TextString):
++        def __init__(self, value=None):
++            super(VendorAttribute.AttributeName, self).__init__(
++                value, Tags.ATTRIBUTE_NAME)
++
++    class AttributeValue(Integer):
++        def __init__(self, value=None):
++            super(VendorAttribute.AttributeValue, self).__init__(
++                value, Tags.ATTRIBUTE_VALUE)
++
++    def __init__(self,
++                 vendor_identification=None,
++                 attribute_name=None,
++                 attribute_value=None):
++        super(VendorAttribute, self).__init__(tag=Tags.ATTRIBUTE)
++        self.vendor_identification = VendorAttribute.VendorIdentification(vendor_identification)
++        self.attribute_name = VendorAttribute.AttributeName(attribute_name)
++        self.attribute_value = VendorAttribute.AttributeValue(attribute_value)
++
++    def write(self, ostream, kmip_version=enums.KMIPVersion.KMIP_2_0):
++        tstream = BytearrayStream()
++
++        self.vendor_identification.write(tstream, kmip_version=kmip_version)
++        self.attribute_name.write(tstream, kmip_version=kmip_version)
++        self.attribute_value.write(tstream, kmip_version=kmip_version)
++
++        # Write the length and value of the attribute
++        self.length = tstream.length()
++        super(VendorAttribute, self).write(ostream, kmip_version=kmip_version)
++        ostream.write(tstream.buffer)
++
++
+ class CurrentAttribute(primitives.Struct):
+     """
+     A structure containing a single attribute.
+@@ -1943,10 +1981,10 @@ class AttestationCredential(CredentialValue):
+     def __str__(self):
+         return "{" \
+                "'nonce': " + str(self.nonce) + ", " \
+-               "'attestation_type': " + str(self.attestation_type) + ", " \
+-               "'attestation_measurement': " + \
++                                               "'attestation_type': " + str(self.attestation_type) + ", " \
++                                                                                                     "'attestation_measurement': " + \
+                str(self.attestation_measurement) + ", " \
+-               "'attestation_assertion': " + \
++                                                   "'attestation_assertion': " + \
+                str(self.attestation_assertion) + "}"
+ 
+ 
+@@ -2148,7 +2186,6 @@ class Credential(primitives.Struct):
+ 
+ 
+ class KeyBlock(Struct):
+-
+     class KeyCompressionType(Enumeration):
+ 
+         def __init__(self, value=None):
+@@ -3632,6 +3669,7 @@ class ExtensionName(TextString):
+     Attributes:
+         value: The string data representing the extension name.
+     """
++
+     def __init__(self, value=''):
+         """
+         Construct an ExtensionName object.
+@@ -3653,6 +3691,7 @@ class ExtensionTag(Integer):
+     Attributes:
+         value: The tag number identifying the extended object.
+     """
++
+     def __init__(self, value=0):
+         """
+         Construct an ExtensionTag object.
+@@ -3675,6 +3714,7 @@ class ExtensionType(Integer):
+     Attributes:
+         value: The type enumeration for the extended object.
+     """
++
+     def __init__(self, value=None):
+         """
+         Construct an ExtensionType object.
+@@ -3701,6 +3741,7 @@ class ExtensionInformation(Struct):
+         extension_tag: The tag of the extended Object.
+         extension_type: The type of the extended Object.
+     """
++
+     def __init__(self, extension_name=None, extension_tag=None,
+                  extension_type=None):
+         """
+@@ -5475,8 +5516,8 @@ class ValidationInformation(primitives.Struct):
+         local_buffer = utils.BytearrayStream(input_buffer.read(self.length))
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_AUTHORITY_TYPE,
+-            local_buffer
++                enums.Tags.VALIDATION_AUTHORITY_TYPE,
++                local_buffer
+         ):
+             validation_authority_type = primitives.Enumeration(
+                 enums.ValidationAuthorityType,
+@@ -5494,8 +5535,8 @@ class ValidationInformation(primitives.Struct):
+             )
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_AUTHORITY_COUNTRY,
+-            local_buffer
++                enums.Tags.VALIDATION_AUTHORITY_COUNTRY,
++                local_buffer
+         ):
+             validation_authority_country = primitives.TextString(
+                 tag=enums.Tags.VALIDATION_AUTHORITY_COUNTRY
+@@ -5509,7 +5550,7 @@ class ValidationInformation(primitives.Struct):
+         if self.is_tag_next(enums.Tags.VALIDATION_AUTHORITY_URI, local_buffer):
+             validation_authority_uri = primitives.TextString(
+                 tag=enums.Tags.VALIDATION_AUTHORITY_URI
+-                )
++            )
+             validation_authority_uri.read(
+                 local_buffer,
+                 kmip_version=kmip_version
+@@ -5517,8 +5558,8 @@ class ValidationInformation(primitives.Struct):
+             self._validation_authority_uri = validation_authority_uri
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_VERSION_MAJOR,
+-            local_buffer
++                enums.Tags.VALIDATION_VERSION_MAJOR,
++                local_buffer
+         ):
+             validation_version_major = primitives.Integer(
+                 tag=enums.Tags.VALIDATION_VERSION_MAJOR
+@@ -5535,8 +5576,8 @@ class ValidationInformation(primitives.Struct):
+             )
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_VERSION_MINOR,
+-            local_buffer
++                enums.Tags.VALIDATION_VERSION_MINOR,
++                local_buffer
+         ):
+             validation_version_minor = primitives.Integer(
+                 tag=enums.Tags.VALIDATION_VERSION_MINOR
+@@ -5576,8 +5617,8 @@ class ValidationInformation(primitives.Struct):
+             )
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_CERTIFICATE_IDENTIFIER,
+-            local_buffer
++                enums.Tags.VALIDATION_CERTIFICATE_IDENTIFIER,
++                local_buffer
+         ):
+             validation_certificate_identifier = primitives.TextString(
+                 tag=enums.Tags.VALIDATION_CERTIFICATE_IDENTIFIER
+@@ -5590,8 +5631,8 @@ class ValidationInformation(primitives.Struct):
+                 validation_certificate_identifier
+ 
+         if self.is_tag_next(
+-            enums.Tags.VALIDATION_CERTIFICATE_URI,
+-            local_buffer
++                enums.Tags.VALIDATION_CERTIFICATE_URI,
++                local_buffer
+         ):
+             validation_certificate_uri = primitives.TextString(
+                 tag=enums.Tags.VALIDATION_CERTIFICATE_URI
+@@ -6191,8 +6232,8 @@ class CapabilityInformation(primitives.Struct):
+ 
+         if kmip_version >= enums.KMIPVersion.KMIP_1_4:
+             if self.is_tag_next(
+-                enums.Tags.BATCH_UNDO_CAPABILITY,
+-                local_buffer
++                    enums.Tags.BATCH_UNDO_CAPABILITY,
++                    local_buffer
+             ):
+                 batch_undo_capability = primitives.Boolean(
+                     tag=enums.Tags.BATCH_UNDO_CAPABILITY
+@@ -6204,8 +6245,8 @@ class CapabilityInformation(primitives.Struct):
+                 self._batch_continue_capability = batch_undo_capability
+ 
+             if self.is_tag_next(
+-                enums.Tags.BATCH_CONTINUE_CAPABILITY,
+-                local_buffer
++                    enums.Tags.BATCH_CONTINUE_CAPABILITY,
++                    local_buffer
+             ):
+                 batch_continue_capability = primitives.Boolean(
+                     tag=enums.Tags.BATCH_CONTINUE_CAPABILITY
+@@ -6516,8 +6557,8 @@ class ProtectionStorageMasks(primitives.Struct):
+ 
+         protection_storage_masks = []
+         while self.is_tag_next(
+-            enums.Tags.PROTECTION_STORAGE_MASK,
+-            local_buffer
++                enums.Tags.PROTECTION_STORAGE_MASK,
++                local_buffer
+         ):
+             protection_storage_mask = primitives.Integer(
+                 tag=enums.Tags.PROTECTION_STORAGE_MASK
+diff --git a/kmip/services/server/crypto/engine.py b/kmip/services/server/crypto/engine.py
+index 3c6534a..cad2088 100644
+--- a/kmip/services/server/crypto/engine.py
++++ b/kmip/services/server/crypto/engine.py
+@@ -1203,7 +1203,8 @@ class CryptographyEngine(api.CryptographicEngine):
+                  key_material,
+                  wrapping_method,
+                  key_wrap_algorithm,
+-                 encryption_key):
++                 encryption_key,
++                 ):
+         """
+         Args:
+             key_material (bytes): The bytes of the key to wrap. Required.
+diff --git a/kmip/services/server/engine.py b/kmip/services/server/engine.py
+index 43fdbe9..9d574ed 100644
+--- a/kmip/services/server/engine.py
++++ b/kmip/services/server/engine.py
+@@ -2585,23 +2585,45 @@ class KmipEngine(object):
+                     encryption_key_uuid
+                 ))
+ 
+-                result = self._cryptography_engine.wrap_key(
+-                    key_material=managed_object.value,
+-                    wrapping_method=key_wrapping_spec.wrapping_method,
+-                    key_wrap_algorithm=encryption_key_params.block_cipher_mode,
+-                    encryption_key=key.value
+-                )
++                if encryption_key_params.block_cipher_mode == enums.BlockCipherMode.GCM:
++                    result = self._cryptography_engine.encrypt(
++                        encryption_algorithm=encryption_key_params.cryptographic_algorithm,
++                        encryption_key=key.value,
++                        plain_text=managed_object.value,
++                        cipher_mode=encryption_key_params.block_cipher_mode,
++                        auth_tag_length=encryption_key_params.tag_length
++                    )
+ 
+-                wrapped_object = copy.deepcopy(managed_object)
+-                wrapped_object.value = result
++                    wrapped_object = copy.deepcopy(managed_object)
++                    wrapped_object.value = result.get('cipher_text')
+ 
+-                core_secret = self._build_core_object(wrapped_object)
+-                key_wrapping_data = KeyWrappingData(
+-                    wrapping_method=wrapping_method,
+-                    encryption_key_information=key_info,
+-                    encoding_option=encoding_option
+-                )
+-                core_secret.key_block.key_wrapping_data = key_wrapping_data
++                    core_secret = self._build_core_object(wrapped_object)
++                    key_wrapping_data = KeyWrappingData(
++                        wrapping_method=wrapping_method,
++                        encryption_key_information=key_info,
++                        encoding_option=encoding_option,
++                        mac_signature=result.get('auth_tag'),
++                        iv_counter_nonce=result.get('iv_nonce')
++                    )
++                    core_secret.key_block.key_wrapping_data = key_wrapping_data
++                else:
++                    result = self._cryptography_engine.wrap_key(
++                        key_material=managed_object.value,
++                        wrapping_method=key_wrapping_spec.wrapping_method,
++                        key_wrap_algorithm=encryption_key_params.block_cipher_mode,
++                        encryption_key=key.value
++                    )
++
++                    wrapped_object = copy.deepcopy(managed_object)
++                    wrapped_object.value = result
++
++                    core_secret = self._build_core_object(wrapped_object)
++                    key_wrapping_data = KeyWrappingData(
++                        wrapping_method=wrapping_method,
++                        encryption_key_information=key_info,
++                        encoding_option=encoding_option
++                    )
++                    core_secret.key_block.key_wrapping_data = key_wrapping_data
+ 
+             elif key_wrapping_spec.mac_signature_key_information:
+                 raise exceptions.PermissionDenied(

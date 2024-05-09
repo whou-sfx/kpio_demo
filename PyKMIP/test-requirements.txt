@@ -1,0 +1,10 @@
+coverage
+pytest
+flake8
+testtools
+fixtures
+mock
+slugs
+sphinx
+PyYAML
+bandit
