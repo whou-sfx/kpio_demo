@@ -1,0 +1,8 @@
+---- hashPwd Matches (4 in 2 files) ----
+DtaSession.cpp (Common) line 117 : 		if (hashPwd) {
+DtaSession.cpp (Common) line 179 : 		if (hashPwd) {
+DtaSession::dontHashPwd in DtaSession.cpp (Common) line 267 : 	hashPwd = 0;
+DtaSession in DtaSession.h (Common) line 101 : 	uint8_t hashPwd = 0;  /**< hash the password when authenticating */
+---- hashPwd Search Errors Encountered (1) ----
+The following 1 files could not be processed:
+\\192.168.110.47\share\tcn\Git\sedutil-cli\linuxpba : File could not be opened.

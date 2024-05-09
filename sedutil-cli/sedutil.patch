@@ -1,0 +1,19 @@
+diff --git a/Common/DtaDevOpal.cpp b/Common/DtaDevOpal.cpp
+index 2bf8feb..f354780 100644
+--- a/Common/DtaDevOpal.cpp
++++ b/Common/DtaDevOpal.cpp
+@@ -740,7 +740,13 @@ uint8_t DtaDevOpal::setPassword(char * password, char * userid, char * newpasswo
+     }
+     else {
+ #endif //__linux__
+-        DtaHashPwd(hash, newpassword, this);
++        /*QA require password dont hash*/
++        //DtaHashPwd(hash, newpassword, this);
++        hash->push_back(0xd0);
++        hash->push_back((uint8_t)strnlen(newpassword, 255));
++        for (uint16_t i = 0; i < strnlen(newpassword, 255); i++) {
++            hash->push_back(newpassword[i]);
++        }
+ #ifdef __linux__
+     }
+ #endif //__linux__
