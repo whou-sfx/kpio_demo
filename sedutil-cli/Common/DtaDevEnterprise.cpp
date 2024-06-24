@@ -1425,7 +1425,7 @@ uint16_t DtaDevEnterprise::comID()
     LOG(D1) << "Entering DtaDevEnterprise::comID()";
     return disk_info.Enterprise_basecomID;
 }
-uint8_t DtaDevEnterprise::exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id)
+uint8_t DtaDevEnterprise::exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id, uint32_t nsid)
 {
     uint8_t rc = 0;
     OPALHeader * hdr = (OPALHeader *) cmd->getCmdBuffer();
@@ -1696,10 +1696,16 @@ uint8_t DtaDevEnterprise::addUserToLockingACEs(const char *userid, char * Admin1
 	return 0;
 }
 
-uint8_t DtaDevEnterprise::sendKmipCommand(char * password, char * filename)
+uint8_t DtaDevEnterprise::sendKmipCommand(char * filename)
 {
     return 0;
 }
+
+uint8_t DtaDevEnterprise::clearKpioMek(uint16_t keytag, uint32_t nsid)
+{
+    return 0;
+}
+
 
 #ifdef _MSC_VER
 #pragma warning(pop)

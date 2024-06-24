@@ -55,9 +55,10 @@ public:
 	* @param comID communications ID to be used
 	* @param buffer input/output buffer
 	* @param bufferlen length of the input/output buffer
+	* @param nsid namespaceID
 	*/
 	uint8_t	sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-		void * buffer, uint32_t bufferlen);
+		void * buffer, uint32_t bufferlen, uint32_t nsid);
 	/** OS specific routine to send an ATA identify to the device */
 	void identify(OPAL_DiskInfo& disk_info);
 private:

@@ -67,7 +67,7 @@ bool DtaDevLinuxNvme::init(const char * devref)
 
 /** Send an ioctl to the device using nvme admin commands. */
 uint8_t DtaDevLinuxNvme::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-                         void * buffer, uint32_t bufferlen)
+                         void * buffer, uint32_t bufferlen, uint32_t nsid)
 {
     struct nvme_admin_cmd nvme_cmd;
 	int err;
@@ -79,6 +79,7 @@ uint8_t DtaDevLinuxNvme::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comI
 	if (IF_RECV == cmd) {
 		LOG(D3) << "Security Receive Command";
 		nvme_cmd.opcode = NVME_SECURITY_RECV;
+        nvme_cmd.nsid = nsid;
 		nvme_cmd.cdw10 = protocol << 24 | comID << 8;
 		nvme_cmd.cdw11 = bufferlen;
 		nvme_cmd.data_len = bufferlen;
@@ -87,6 +88,7 @@ uint8_t DtaDevLinuxNvme::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comI
 	else {
 		LOG(D3) << "Security Send Command";
 		nvme_cmd.opcode = NVME_SECURITY_SEND;
+        nvme_cmd.nsid = nsid;
 		nvme_cmd.cdw10 = protocol << 24 | comID << 8;
 		nvme_cmd.cdw11 = bufferlen;
 		nvme_cmd.data_len = bufferlen;

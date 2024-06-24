@@ -1658,34 +1658,52 @@ uint8_t DtaDevOpal::getTable(vector<uint8_t> table, uint16_t startcol,
 	delete get;
 	return 0;
 }
-uint8_t DtaDevOpal::exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id)
+uint8_t DtaDevOpal::exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id, uint32_t nsid)
 {
 	uint8_t lastRC;
     if (com_id == 0xffff) {
         com_id = comID();
     }
-    OPALHeader * hdr = (OPALHeader *) cmd->getCmdBuffer();
-    LOG(D3) << endl << "Dumping command buffer";
-    IFLOG(D3) DtaHexDump(cmd->getCmdBuffer(), SWAP32(hdr->cp.length) + sizeof (OPALComPacket));
-    if((lastRC = sendCmd(IF_SEND, protocol, com_id, cmd->getCmdBuffer(), cmd->outputBufferSize())) != 0) {
-		LOG(E) << "Command failed on send " << (uint16_t) lastRC;
-        return lastRC;
-    }
-    hdr = (OPALHeader *) cmd->getRespBuffer();
-    do {
-        osmsSleep(25);
-        memset(cmd->getRespBuffer(), 0, MIN_BUFFER_LENGTH);
-        lastRC = sendCmd(IF_RECV, protocol, com_id, cmd->getRespBuffer(), MIN_BUFFER_LENGTH);
+    if (protocol != 0x2) {
+        OPALHeader * hdr = (OPALHeader *) cmd->getCmdBuffer();
+        LOG(D3) << endl << "Dumping command buffer";
+        IFLOG(D3) DtaHexDump(cmd->getCmdBuffer(), SWAP32(hdr->cp.length) + sizeof (OPALComPacket));
+        if((lastRC = sendCmd(IF_SEND, protocol, com_id, cmd->getCmdBuffer(), cmd->outputBufferSize())) != 0) {
+    		LOG(E) << "Command failed on send " << (uint16_t) lastRC;
+            return lastRC;
+        }
+        hdr = (OPALHeader *) cmd->getRespBuffer();
+        do {
+            osmsSleep(25);
+            memset(cmd->getRespBuffer(), 0, MIN_BUFFER_LENGTH);
+            lastRC = sendCmd(IF_RECV, protocol, com_id, cmd->getRespBuffer(), MIN_BUFFER_LENGTH, nsid);
 
+        }
+        while ((0 != hdr->cp.outstandingData) && (0 == hdr->cp.minTransfer));
+        LOG(D3) << std::endl << "Dumping reply buffer";
+        IFLOG(D3) DtaHexDump(cmd->getRespBuffer(), SWAP32(hdr->cp.length) + sizeof (OPALComPacket));
+    	if (0 != lastRC) {
+            LOG(E) << "Command failed on recv" << (uint16_t) lastRC;
+            return lastRC;
+        }
+        resp.init(cmd->getRespBuffer());
+    } else {
+        if((lastRC = sendCmd(IF_SEND, protocol, com_id, cmd->getCmdBuffer(), cmd->outputBufferSize(), nsid)) != 0) {
+    		LOG(E) << "Command failed on send " << (uint16_t) lastRC;
+            return lastRC;
+        }
+        HandleComIdResponse * response = (HandleComIdResponse *) cmd->getRespBuffer();
+        do {
+            osmsSleep(25);
+            memset(cmd->getRespBuffer(), 0, MIN_BUFFER_LENGTH);
+            lastRC = sendCmd(IF_RECV, protocol, com_id, cmd->getRespBuffer(), MIN_BUFFER_LENGTH, nsid);
+            if (0 != lastRC) {
+                LOG(E) << "Command failed on recv" << (uint16_t) lastRC;
+                return lastRC;
+            }
+        }
+        while ((0 != response->available_data_length));
     }
-    while ((0 != hdr->cp.outstandingData) && (0 == hdr->cp.minTransfer));
-    LOG(D3) << std::endl << "Dumping reply buffer";
-    IFLOG(D3) DtaHexDump(cmd->getRespBuffer(), SWAP32(hdr->cp.length) + sizeof (OPALComPacket));
-	if (0 != lastRC) {
-        LOG(E) << "Command failed on recv" << (uint16_t) lastRC;
-        return lastRC;
-    }
-    resp.init(cmd->getRespBuffer());
     return 0;
 }
 
@@ -2311,7 +2329,7 @@ uint8_t DtaDevOpal::setKpioPolicies(uint8_t policies_mask, char * password)
 	return 0;
 }
 
-uint8_t DtaDevOpal::sendKmipCommand(char * password, char * filename)
+uint8_t DtaDevOpal::sendKmipCommand(char * filename)
 {
 	LOG(D1) << "Entering DtaDevOpal::sendKmipCommand()";
     DtaCommand  *cmd = new DtaCommand();
@@ -2334,5 +2352,30 @@ uint8_t DtaDevOpal::sendKmipCommand(char * password, char * filename)
     delete cmd;
     LOG(D1) << "Exiting DtaDevOpal::sendKmipCommand()";
 	return 0;
+}
+
+uint8_t DtaDevOpal::clearKpioMek(uint16_t keytag, uint32_t nsid)
+{
+    LOG(D1) << "Entering DtaDevOpal::clearKpioMek()";
+    DtaCommand  *cmd = new DtaCommand();
+    cmd->reset();
+    cmd->setcomID(comID()+0x2);
+    cmd->bufferpos = 1024;
+    HandleComIdRequest * request = (HandleComIdRequest *)cmd->cmdbuf;
+    if (keytag == 0xffff) {
+        request->request_code = SWAP32(0x4); //clear all meks
+    } else {
+        request->request_code = SWAP32(0x3);
+        request->reserved = SWAP32(keytag);
+    }
+    uint8_t exec_rc = exec(cmd, response, 0x2, comID()+0x1, nsid);
+    if (exec_rc != 0) {
+        LOG(E) << "Command failed on exec " << (uint16_t) exec_rc;
+        delete cmd;
+        return exec_rc;
+    }
+    delete cmd;
+    LOG(D1) << "Exiting DtaDevOpal::clearKpioMek()";
+    return 0;
 }
 

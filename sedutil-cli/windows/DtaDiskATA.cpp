@@ -52,7 +52,7 @@ void DtaDiskATA::init(const char * devref)
         isOpen = TRUE;
 }
 uint8_t DtaDiskATA::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-                        void * buffer, uint32_t bufferlen)
+                        void * buffer, uint32_t bufferlen, uint32_t nsid=0)
 {
     LOG(D1) << "Entering DtaDiskATA::sendCmd";
     DWORD bytesReturned = 0; // data returned

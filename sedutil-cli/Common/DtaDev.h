@@ -96,9 +96,10 @@ public:
 	 * @param comID communications ID to be used
 	 * @param buffer input/output buffer
 	 * @param bufferlen length of the input/output buffer
+	 * @param nsid namespaceID
 	 */
 	virtual uint8_t sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-		void * buffer, uint32_t bufferlen) = 0;
+		void * buffer, uint32_t bufferlen, uint32_t nsid=0) = 0;
 	/** OS specific command to Wait for specified number of milliseconds
 	 * @param milliseconds  number of milliseconds to wait
 	 */
@@ -295,7 +296,7 @@ public:
 	 * @param response the DtaResonse object containing the response
 	 * @param protocol The security protocol number to use for the command
 	 */
-	virtual uint8_t exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol = 0x01, uint16_t com_id = 0xffff) = 0;
+	virtual uint8_t exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol = 0x01, uint16_t com_id = 0xffff, uint32_t nsid=0) = 0;
 	/** return the communications ID to be used for sessions to this device */
 	virtual uint16_t comID() = 0;
 	/** Add the UserX authority to Locking (Rd/RW) ACEs
@@ -304,7 +305,9 @@ public:
 	 */
     virtual uint8_t addUserToLockingACEs(const char *userid, char* Admin1Password) = 0;
 
-    virtual uint8_t sendKmipCommand(char * password, char * filename) = 0;
+    virtual uint8_t sendKmipCommand(char * filename) = 0;
+
+    virtual uint8_t clearKpioMek(uint16_t keytag = 0xffff, uint32_t nsid = 0xffffffff) = 0;
     
 	bool no_hash_passwords; /** disables hashing of passwords */
 	bool hex_passwords; /** converts passwords from hex before using them */

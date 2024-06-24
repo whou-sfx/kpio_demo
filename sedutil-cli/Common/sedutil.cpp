@@ -286,7 +286,11 @@ int main(int argc, char * argv[])
 		break;
     case sedutiloption::sendKmipCommand:
         LOG(D) << "Performing sendKmipCommand";
-        return d->sendKmipCommand(GET_PASSWORD(), argv[opts.kmipfile]);
+        return d->sendKmipCommand(argv[opts.kmipfile]);
+		break;
+    case sedutiloption::clearKpioMek:
+        LOG(D) << "Performing clearKpioMek";
+        return d->clearKpioMek(atoll(argv[opts.keytag]), atoll(argv[opts.nsid]));
 		break;
     default:
         LOG(E) << "Unable to determine what you want to do ";

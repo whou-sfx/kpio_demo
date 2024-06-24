@@ -42,6 +42,8 @@ typedef struct _DTA_OPTIONS {
 	uint8_t lrstart;		/** the starting block of a lockingrange */
 	uint8_t lrlength;		/** the length in blocks of a lockingrange */
     uint8_t kmipfile;
+    uint16_t keytag;
+    uint32_t nsid;
 
 	bool no_hash_passwords; /** global parameter, disables hashing of passwords */
     bool secure_mode; /** global parameter, enable the secure mode */
@@ -104,6 +106,7 @@ typedef enum _sedutiloption {
 	rawCmd,
     addUserToLockingACEs,
     sendKmipCommand,
+    clearKpioMek,
 } sedutiloption;
 
 /** verify the number of arguments passed */

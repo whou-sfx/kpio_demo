@@ -112,6 +112,8 @@ void usage()
     printf("                                This command will save the password to kernel memory\n");
     printf("--sendKmipCommand <Admin1password> <file> <device> \n");
     printf("                                Send <file> KMIP Buffer Data\n");
+    printf("--clearKpioMek <keytag> <namespace> <device> \n");
+    printf("                                Clear Kpio Mek by keytag in specific namespace\n");
     printf("\n");
     printf("Examples \n");
     printf("sedutil-cli --scan \n");
@@ -555,8 +557,15 @@ uint8_t DtaOptions(int argc, char * argv[], DTA_OPTIONS * opts)
 			OPTION_IS(password)
 			OPTION_IS(device)
 			END_OPTION
-		BEGIN_OPTION(sendKmipCommand, 3, 2) OPTION_IS(password) OPTION_IS(kmipfile)
-		  OPTION_IS(device) END_OPTION
+		BEGIN_OPTION(sendKmipCommand, 2, 1)
+		    OPTION_IS(kmipfile)
+		    OPTION_IS(device)
+		    END_OPTION
+		BEGIN_OPTION(clearKpioMek, 3, 2)
+		    OPTION_IS(keytag)
+		    OPTION_IS(nsid)
+		    OPTION_IS(device)
+		    END_OPTION
 		BEGIN_OPTION(objDump, 5, 5) i += 4; OPTION_IS(device) END_OPTION
     BEGIN_OPTION(printDefaultPassword, 1, 1) OPTION_IS(device) END_OPTION
 		BEGIN_OPTION(rawCmd, 7, 7) i += 6; OPTION_IS(device) END_OPTION

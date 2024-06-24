@@ -106,11 +106,11 @@ void DtaDevOS::init(const char * devref)
 }
 
 uint8_t DtaDevOS::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-                        void * buffer, uint32_t bufferlen)
+                        void * buffer, uint32_t bufferlen, uint32_t nsid)
 {
     LOG(D1) << "Entering DtaDevOS::sendCmd";
 	LOG(D1) << "Exiting DtaDevOS::sendCmd";
-	return (disk->sendCmd(cmd, protocol, comID, buffer, bufferlen));
+	return (disk->sendCmd(cmd, protocol, comID, buffer, bufferlen, nsid));
 }
 
 void DtaDevOS::osmsSleep(uint32_t milliseconds)

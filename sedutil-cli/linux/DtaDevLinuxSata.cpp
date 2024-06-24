@@ -89,7 +89,7 @@ bool DtaDevLinuxSata::init(const char * devref)
 
 /** Send an ioctl to the device using pass through. */
 uint8_t DtaDevLinuxSata::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-                         void * buffer, uint32_t bufferlen)
+                         void * buffer, uint32_t bufferlen, uint32_t nsid)
 {
     if(isSAS) {
         return(sendCmd_SAS(cmd, protocol, comID, buffer, bufferlen));

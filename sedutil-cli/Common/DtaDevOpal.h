@@ -56,7 +56,7 @@ public:
          * @param response the DtaResonse object containing the response
          * @param protocol The security protocol number to use for the command
          */
-	uint8_t exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol = 0x01, uint16_t com_id=0xffff);
+	uint8_t exec(DtaCommand * cmd, DtaResponse & resp, uint8_t protocol = 0x01, uint16_t com_id=0xffff, uint32_t nsid=0);
          /** return the communications ID to be used for sessions to this device */
 	virtual uint16_t comID() = 0;
         /** Change the SID password from it's MSID default 
@@ -277,7 +277,9 @@ public:
       */
     uint8_t addUserToLockingACEs(const char *userid, char *Admin1Password);
 
-    uint8_t sendKmipCommand(char * password, char * filename);
+    uint8_t sendKmipCommand(char * filename);
+
+    uint8_t clearKpioMek(uint16_t keytag = 0xffff, uint32_t nsid=0xffffffff);
 protected:
         /** Primitive to handle the setting of a value in the locking sp.
          * @param table_uid UID of the table 

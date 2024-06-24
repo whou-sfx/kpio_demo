@@ -233,6 +233,20 @@ union Discovery0Features {
 
 /** ComPacket (header) for transmissions. */
 
+typedef struct _HandleComIdRequest {
+    uint32_t extended_com_base;
+	uint32_t request_code;
+	uint16_t reserved; 
+} HandleComIdRequest;
+
+typedef struct _HandleComIdResponse {
+    uint32_t extended_com_base;
+	uint32_t request_code;
+	uint16_t reserved;
+	uint16_t available_data_length;
+	uint32_t status;
+} HandleComIdResponse;
+
 typedef struct _OPALComPacket {
     uint32_t reserved0;
     uint8_t extendedComID[4];

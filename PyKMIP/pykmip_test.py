@@ -217,18 +217,17 @@ class KpioWrappingMekInject(KpioRequestMessage):
 
 class KpioSedutil:
     def __init__(self):
-        self.password = 'ScaleFlux'
         self.sedutil = './sedutil-cli'
         if not os.path.exists(self.sedutil):
             sys.exit('%s not exist' % self.sedutil)
 
-    def setup(self, dev):
-        os.system('%s --initialSetup %s %s' % (self.sedutil, self.password, dev))
+    def setup(self, dev, password):
+        os.system('%s --initialSetup %s %s' % (self.sedutil, password, dev))
 
-    def revert(self, dev):
-        os.system('%s --revertTper %s %s' % (self.sedutil, self.password, dev))
+    def revert(self, dev, password):
+        os.system('%s --revertTper %s %s' % (self.sedutil, password, dev))
 
-    def send(self, dev, object):
+    def sendKmip(self, dev, object):
         tmp_file = '/tmp/%s' % object.__class__.__name__
         if os.path.exists(tmp_file):
             os.remove(tmp_file)
@@ -236,7 +235,10 @@ class KpioSedutil:
             tstream = BytearrayStream()
             object.write(tstream, kmip_version=enums.KMIPVersion.KMIP_2_0)
             fd.write(tstream.buffer)
-        os.system('%s --sendKmipCommand %s %s %s' % (self.sedutil, self.password, tmp_file, dev))
+        os.system('%s --sendKmipCommand %s %s' % (self.sedutil, tmp_file, dev))
+
+    def clearMek(self, dev, key_tag, ns_id):
+        os.system('%s --clearKpioMek %s %s %s' % (self.sedutil, key_tag, ns_id, dev))
 
 
 class KpioNvmeCli:
@@ -256,8 +258,8 @@ class KpioNvmeCli:
 
 class KpioTool:
     def __init__(self):
-        self.kpio_version = "sfx-key-manager version 1.0\n"
-        self.kpio_help = "usage: sfx-key-manager <command> [<device>] [<args>]\n\n" \
+        self.kpio_version = "sfx-kpio version 1.0\n"
+        self.kpio_help = "usage: sfx-kpio <command> [<device>] [<args>]\n\n" \
                          "The '<device>' may be either an NVMe character device (ex: /dev/nvme0) or an\n" \
                          "nvme block device (ex: /dev/nvme0n1).\n\n" \
                          "The following are all implemented sub-commands:\n" \
@@ -266,14 +268,19 @@ class KpioTool:
                          "  create-key        create key and info key uid\n" \
                          "  inject-kek        inject plain-text | wrapping kek into device\n" \
                          "  inject-mek        inject wrapping mek into device\n" \
+                         "  clear-mek         clear wrapping mek in device\n" \
                          "  read-write-data   read/write data with key-tag\n" \
-                         "See 'sfx-key-manager <command>' for more information on a specific command\n"
+                         "See 'sfx-kpio <command>' for more information on a specific command\n"
 
         self.setup_help = "setup: invalid argument\n" \
-                          "usage: sfx-kpio setup\n\n"
+                          "usage: sfx-kpio setup [OPTIONS]\n\n" \
+                          "Options:\n" \
+                          "  [  --password=<STR>, -p <STR> ]   --- password for tcg\n"
 
         self.revert_help = "revert: invalid argument\n" \
-                           "usage: sfx-kpio revert\n\n"
+                           "usage: sfx-kpio revert [OPTIONS]\n\n" \
+                           "Options:\n" \
+                           "  [  --password=<STR>, -p <STR> ]   --- password for tcg\n"
 
         self.create_key_help = "create-key: invalid argument\n" \
                                "usage: sfx-kpio create_key\n\n"
@@ -293,24 +300,31 @@ class KpioTool:
                                "  [  --key-tag=<NUM>, -t <NUM> ] --- mek key tag\n" \
                                "  [  --wrap=<NUM>, -w <NUM> ]    --- wrap key uid for kmip\n"
 
-        self.read_write_data_help = "read-write-data: invalid argument\n" \
-                              "usage: sfx-kpio read-write-data [OPTIONS]\n\n" \
+        self.clear_mek_help = "clear-mek: invalid argument\n" \
+                              "usage: sfx-kpio clear-mek [OPTIONS]\n\n" \
                               "Options:\n" \
-                              "  [  --start=<NUM>, -s <NUM> ]   --- start block\n" \
-                              "  [  --count=<NUM>, -c <NUM> ]   --- block count\n" \
-                              "  [  --size=<NUM>, -z <NUM> ]    --- block size\n" \
-                              "  [  --file=<FILE>, -f <NUM> ]   --- data file\n" \
-                              "  [  --key-tag=<NUM>, -t <NUM> ] --- mek key tag\n" \
-                              "  [  --write, -w ]               --- write data(default read)\n"
+                              "  [  --key-tag=<NUM>, -t <NUM> ] --- mek key tag(default all meks)\n" \
+                              "  [  --ns-id=<NUM>, -n <NUM> ]   --- mek namespace id(default all namespaces)\n"
+
+        self.read_write_data_help = "read-write-data: invalid argument\n" \
+                                    "usage: sfx-kpio read-write-data [OPTIONS]\n\n" \
+                                    "Options:\n" \
+                                    "  [  --start=<NUM>, -s <NUM> ]   --- start block\n" \
+                                    "  [  --count=<NUM>, -c <NUM> ]   --- block count\n" \
+                                    "  [  --size=<NUM>, -z <NUM> ]    --- block size\n" \
+                                    "  [  --file=<FILE>, -f <NUM> ]   --- data file\n" \
+                                    "  [  --key-tag=<NUM>, -t <NUM> ] --- mek key tag\n" \
+                                    "  [  --write, -w ]               --- write data(default read)\n"
 
         self.command_dict = {'setup': [self.setup_exec, self.setup_help],
                              'revert': [self.revert_exec, self.revert_help],
                              'create-key': [self.create_key_exec, self.create_key_help],
                              'inject-kek': [self.inject_kek_exec, self.inject_kek_help],
                              'inject-mek': [self.inject_mek_exec, self.inject_mek_help],
+                             'clear-mek': [self.clear_mek_exec, self.clear_mek_help],
                              'read-write-data': [self.read_write_data_exec, self.read_write_data_help]}
 
-        self.kpio_sedutil  = KpioSedutil()
+        self.kpio_sedutil = KpioSedutil()
         self.kpio_nvme_cli = KpioNvmeCli()
         self.kpio_enable = False
         self.kpio_client = ProxyKmipClient(
@@ -339,7 +353,7 @@ class KpioTool:
                 else:
                     self.do_help(command=self.command)
             else:
-                if self.command == 'setup' or self.command == 'revert' or self.command == 'create-key':
+                if self.command == 'create-key' or self.command == 'clear-mek':
                     self.command_dict.get(self.command)[0]()
                 else:
                     self.do_help(command=self.command)
@@ -365,10 +379,30 @@ class KpioTool:
         sys.exit(help_str)
 
     def setup_exec(self):
-        self.kpio_sedutil.setup(self.dev)
+        password = None
+        try:
+            opts, args = getopt.getopt(self.args, '-p:', ['--password='])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-p', '--password'):
+                    password = opt_value
+                else:
+                    self.do_help(command=self.command)
+        except:
+            self.do_help(command=self.command)
+        self.kpio_sedutil.setup(self.dev, password)
 
     def revert_exec(self):
-        self.kpio_sedutil.revert(self.dev)
+        password = None
+        try:
+            opts, args = getopt.getopt(self.args, '-p:', ['--password='])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-p', '--password'):
+                    password = opt_value
+                else:
+                    self.do_help(command=self.command)
+        except:
+            self.do_help(command=self.command)
+        self.kpio_sedutil.revert(self.dev, password)
 
     def create_key_exec(self):
         with self.kpio_client:
@@ -389,17 +423,17 @@ class KpioTool:
         wrap_key_uid = None
         try:
             opts, args = getopt.getopt(self.args, '-i:-u:-w:', ['--id=', '--uid=', '--wrap='])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-i', '--id'):
+                    kek_id = opt_value
+                elif opt_name in ('-u', '--uid'):
+                    kek_uid = opt_value
+                elif opt_name in ('-w', '--wrap'):
+                    wrap_key_uid = opt_value
+                else:
+                    self.do_help(command=self.command)
         except:
             self.do_help(command=self.command)
-        for opt_name, opt_value in opts:
-            if opt_name in ('-i', '--id'):
-                kek_id = opt_value
-            elif opt_name in ('-u', '--uid'):
-                kek_uid = opt_value
-            elif opt_name in ('-w', '--wrap'):
-                wrap_key_uid = opt_value
-            else:
-                self.do_help(command=self.command)
         if kek_id is None or kek_uid is None:
             self.do_help(command=self.command)
         elif int(kek_id) != 0x1:
@@ -407,9 +441,9 @@ class KpioTool:
         else:
             with self.kpio_client:
                 if wrap_key_uid is None:
-                    self.kpio_sedutil.send(self.dev, KpioPlainTextKekInject(self.kpio_client, kek_uid))
+                    self.kpio_sedutil.sendKmip(self.dev, KpioPlainTextKekInject(self.kpio_client, kek_uid))
                 else:
-                    self.kpio_sedutil.send(self.dev, KpioWrappingKekInject(self.kpio_client, kek_uid, wrap_key_uid))
+                    self.kpio_sedutil.sendKmip(self.dev, KpioWrappingKekInject(self.kpio_client, kek_uid, wrap_key_uid))
         print('inject kek done')
 
     def inject_mek_exec(self):
@@ -419,25 +453,25 @@ class KpioTool:
         wrap_key_uid = None
         try:
             opts, args = getopt.getopt(self.args, '-u:-n:-t:-w:', ['--uid=', '--ns-id=', '--key-tag=', '--wrap='])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-u', '--uid'):
+                    mek_uid = opt_value
+                elif opt_name in ('-n', '--ns-id'):
+                    ns_id = int(opt_value)
+                elif opt_name in ('-t', '--key-tag'):
+                    key_tag = int(opt_value)
+                elif opt_name in ('-w', '--wrap'):
+                    wrap_key_uid = opt_value
+                else:
+                    self.do_help(command=self.command)
         except:
             self.do_help(command=self.command)
-        for opt_name, opt_value in opts:
-            if opt_name in ('-u', '--uid'):
-                mek_uid = opt_value
-            elif opt_name in ('-n', '--ns-id'):
-                ns_id = int(opt_value)
-            elif opt_name in ('-t', '--key-tag'):
-                key_tag = int(opt_value)
-            elif opt_name in ('-w', '--wrap'):
-                wrap_key_uid = opt_value
-            else:
-                self.do_help(command=self.command)
         if mek_uid is None or ns_id is None or key_tag is None or wrap_key_uid is None:
             self.do_help(command=self.command)
         else:
             with self.kpio_client:
-                self.kpio_sedutil.send(self.dev, KpioWrappingMekInject(self.kpio_client, mek_uid,
-                                                             ns_id, key_tag, wrap_key_uid))
+                self.kpio_sedutil.sendKmip(self.dev, KpioWrappingMekInject(self.kpio_client, mek_uid,
+                                                                           ns_id, key_tag, wrap_key_uid))
         print('inject mek done')
 
     def read_write_data_exec(self):
@@ -449,28 +483,48 @@ class KpioTool:
         write = False
         try:
             opts, args = getopt.getopt(self.args, '-s:-c:-z:-f:-t:-w', ['--start=', '--count=', '--size=', '--file=',
-                                                                      '--key-tag=', '--write'])
+                                                                        '--key-tag=', '--write'])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-s', '--start'):
+                    start = opt_value
+                elif opt_name in ('-c', '--count'):
+                    count = int(opt_value)
+                elif opt_name in ('-z', '--size'):
+                    size = int(opt_value)
+                elif opt_name in ('-f', '--file'):
+                    file = opt_value
+                elif opt_name in ('-t', '--key-tag'):
+                    key_tag = opt_value
+                elif opt_name in ('-w', '--write'):
+                    write = True
+                else:
+                    self.do_help(command=self.command)
         except:
             self.do_help(command=self.command)
-        for opt_name, opt_value in opts:
-            if opt_name in ('-s', '--start'):
-                start = opt_value
-            elif opt_name in ('-c', '--count'):
-                count = int(opt_value)
-            elif opt_name in ('-z', '--size'):
-                size = int(opt_value)
-            elif opt_name in ('-f', '--file'):
-                file = opt_value
-            elif opt_name in ('-t', '--key-tag'):
-                key_tag = opt_value
-            elif opt_name in ('-w', '--write'):
-                write = True
-            else:
-                self.do_help(command=self.command)
         if start is None or count is None or size is None or file is None or key_tag is None:
             self.do_help(command=self.command)
         else:
             self.kpio_nvme_cli.read_write(self.dev, start, count, size, file, key_tag, write)
+
+    def clear_mek_exec(self):
+        key_tag = None
+        ns_id = None
+        try:
+            opts, args = getopt.getopt(self.args, '-t:-n:', ['--key-tag=', '--ns_id='])
+            for opt_name, opt_value in opts:
+                if opt_name in ('-t', '--key-tag'):
+                    key_tag = int(opt_value)
+                elif opt_name in ('-n', '--ns_id'):
+                    ns_id = int(opt_value)
+                else:
+                    self.do_help(command=self.command)
+        except:
+            pass
+        if key_tag is None:
+            key_tag = 65535  # 0xffff
+        if ns_id is None:
+            ns_id = 4294967295  # 0xffffffff
+        self.kpio_sedutil.clearMek(self.dev, key_tag, ns_id)
 
 
 if __name__ == '__main__':

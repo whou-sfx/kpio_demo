@@ -94,7 +94,7 @@ void DtaDevOS::init(const char * devref)
 }
 
 uint8_t DtaDevOS::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
-	void * buffer, uint32_t bufferlen)
+	void * buffer, uint32_t bufferlen, uint32_t nsid)
 {
 	if (!isOpen) return 0xfe; //disk open failed so this will too
 
@@ -104,7 +104,7 @@ uint8_t DtaDevOS::sendCmd(ATACOMMAND cmd, uint8_t protocol, uint16_t comID,
 		return 0xff;
 	}
 
-	return drive->sendCmd(cmd, protocol, comID, buffer, bufferlen);
+	return drive->sendCmd(cmd, protocol, comID, buffer, bufferlen, nsid);
 }
 
 void DtaDevOS::identify(OPAL_DiskInfo& disk_info)

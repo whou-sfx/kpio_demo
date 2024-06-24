@@ -94,7 +94,8 @@ uint8NOCODE(takeOwnership, char * newpassword, bool securemode)
 uint8NOCODE(setSIDPassword,char * oldpassword, char * newpassword,
 	uint8_t hasholdpwd, uint8_t hashnewpwd, bool securemode)
 uint8NOCODE(addUserToLockingACEs, const char* userid, char * Admin1Password)
-uint8NOCODE(sendKmipCommand, char * password, char * filename)
+uint8NOCODE(sendKmipCommand, char * filename)
+uint8NOCODE(clearKpioMek, uint16_t keytag, uint32_t nsid)
 
 uint16_t DtaDevGeneric::comID()
 {
@@ -102,7 +103,7 @@ uint16_t DtaDevGeneric::comID()
 		return 0xff; 
 }
 
-uint8NOCODE(exec,DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id)
+uint8NOCODE(exec,DtaCommand * cmd, DtaResponse & resp, uint8_t protocol, uint16_t com_id, uint32_t nsid)
 uint8NOCODE(objDump,char *sp, char * auth, char *pass,char * objID)
 uint8NOCODE(rawCmd,char *sp, char * auth, char *pass,char *invoker, char *method, char *plist)
 #ifdef _MSC_VER
